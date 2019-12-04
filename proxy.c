@@ -29,6 +29,9 @@
 #define TIME_OUT 5   // seconds
 #define TIME_OUT_MS 5000
 
+#define WHITE_IP_LIST       "white_ip_list.txt"
+#define TOUCH_WHITE_IP_LIST 
+
 #define		debug(fmt, ...)			printf((fmt), ##__VA_ARGS__)
 
 static pthread_mutex_t s_mutex_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -118,8 +121,8 @@ void add_ip(struct ip_root_s *root, const char *ip)
 		/** now node is tail */
 		root->tail = node;		
 	}
+    debug(" -- add ip: \"%s\"\n", ip);
 	strncpy(root->tail->ip, ip, MAX_IP_LEN);
-	
 }
 
 void free_ip_list(struct ip_root_s *root)
@@ -131,6 +134,15 @@ void free_ip_list(struct ip_root_s *root)
 	}
 	root->head = NULL;
 	root->tail = NULL;
+}
+
+#include <sys/stat.h>
+long get_last_modified_time(const char *filename)
+{
+    struct stat s;
+    if (0!=stat(filename, &s))
+        return -1;
+    return (long)s.st_mtime;
 }
 
 void load_white_ips(struct ip_root_s *o_ip_root, const char *filename)
@@ -452,10 +464,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    system("touch white_ip_list.txt");
+    system("touch "WHITE_IP_LIST);
 
     struct ip_root_s ips_root = {NULL, NULL};
-    load_white_ips(&ips_root, "white_ip_list.txt");
+    load_white_ips(&ips_root, WHITE_IP_LIST);
 
     struct sockaddr_in sin = {0};
     sin.sin_family = AF_INET;
@@ -488,11 +500,21 @@ int main(int argc, char *argv[])
     int client_sock;
     int client_len = sizeof(struct sockaddr_in);
 
+    long white_ips_file_time = get_last_modified_time(WHITE_IP_LIST);
+
     while(1) {
+        // if modified white-ip-list, reload it
+        if (white_ips_file_time != get_last_modified_time(WHITE_IP_LIST)) {
+            debug("white ip list modified, reloading...\n");
+            free_ip_list(&ips_root);
+            load_white_ips(&ips_root, WHITE_IP_LIST);
+            white_ips_file_time = get_last_modified_time(WHITE_IP_LIST);
+        }
+
         client_sock = accept(listen_sock, (struct sockaddr *)&cin, (socklen_t *)&client_len);
         //debug("client sock: %d, Connected from %s, processing...\n", client_sock, inet_ntoa(cin.sin_addr));
         if (!check_ip_passed(&ips_root, inet_ntoa(cin.sin_addr))) {
-            debug("illegal ip[%s], refused, check your \"white_ip_list.txt\".\n",
+            debug("illegal ip[%s], refused, check your \""WHITE_IP_LIST"\".\n",
                      inet_ntoa(cin.sin_addr));
             close(client_sock);
             continue;
