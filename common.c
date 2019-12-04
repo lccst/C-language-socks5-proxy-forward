@@ -170,7 +170,7 @@ int forward_data(int sock, int real_server_sock)
         if (FD_ISSET(sock, &fd_read)) {
             //printf("client can read!\n");
             memset(recv_buffer, 0, BUFF_SIZE);
-            ret = x_recv(sock, recv_buffer, BUFF_SIZE, 0);
+            ret = recv(sock, recv_buffer, BUFF_SIZE, 0);
             if (ret <= 0) {
                 debug("sock %d x_recv from client error, %m\n", sock);
                 break;
