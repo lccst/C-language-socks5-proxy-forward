@@ -2,139 +2,13 @@
 //          http://www.rfc-editor.org/rfc/rfc1929.txt
 
 
-#include <stdio.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <pthread.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <assert.h>
-
 #include "proxy.h"
+#include "common.h"
 
 #define USER_NAME "test"
 #define PASS_WORD  "test"
 #define MAX_USER 10
-#define BUFF_SIZE 10240
 
-#define AUTH_CODE 0x02
-
-#define TIME_OUT 5   // seconds
-#define TIME_OUT_MS 10000
-
-#define WHITE_IP_LIST       "white_ip_list.txt"
-#define TOUCH_WHITE_IP_LIST 
-
-#define		debug(fmt, ...)			printf((fmt), ##__VA_ARGS__)
-
-static pthread_mutex_t s_mutex_lock = PTHREAD_MUTEX_INITIALIZER;
-#define LOCK()      pthread_mutex_lock(&s_mutex_lock)
-#define UNLOCK()    pthread_mutex_unlock(&s_mutex_lock)
-
-/** 统计当前存活线程的数目 */
-static int s_thread_cnt = 0;
-#define     threads_cnt_inc()   do{LOCK();s_thread_cnt++;UNLOCK();}while(0)
-#define     threads_cnt_dec()   do{LOCK();s_thread_cnt--;UNLOCK();}while(0)
-int threads_cnt()   
-{
-    LOCK();
-    int ret = s_thread_cnt;
-    UNLOCK();
-    return ret;
-}
-
-/** 用于判断线程是否已经创建完毕，防止地址传的参数被修改 */
-static int s_create_thread_flag = 0;
-static void create_thread_start(int sock)
-{
-    struct timeval timeout={3,0};//3s
-    if (0!=setsockopt(sock,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof(timeout))) {
-        debug("set sock %d opt failed, %m\n", sock);
-    }
-    if (0!=setsockopt(sock,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout))) {
-        debug("set sock %d opt failed, %m\n", sock);
-    }
-    //debug("create thread for sock %d\n", sock);
-    LOCK();
-    s_create_thread_flag = 0;
-    UNLOCK();
-}
-static void thread_created(int sock)
-{
-    LOCK();
-    s_create_thread_flag = 1;
-    UNLOCK();
-    //debug("thread for sock %d already created\n", sock);
-}
-static int is_thread_created()
-{
-    LOCK();
-    int ret = s_create_thread_flag;
-    UNLOCK();
-    return ret;
-}
-
-#include <sys/time.h>
-long get_cur_ms()
-{
-    struct timeval tv;
-    struct timezone tz;
-
-    gettimeofday(&tv, &tz);
-
-    return (long)(tv.tv_sec*1000 + tv.tv_usec/1000);
-}
-
-#define MAX_IP_LEN 18
-struct ip_list_s {
-	char		ip[MAX_IP_LEN];
-	struct ip_list_s *next;
-};
-struct ip_root_s {
-	struct ip_list_s *head;
-	struct ip_list_s *tail;
-};
-
-void add_ip(struct ip_root_s *root, const char *ip)
-{
-	struct ip_list_s *node = NULL;
-
-	if (NULL==root->head) {
-		root->head = malloc(sizeof(struct ip_list_s));
-		assert(root->head);
-		root->head->next = NULL;
-		/** now head is also tail */
-		root->tail = root->head;
-	} else {
-		node = malloc(sizeof(struct ip_list_s));
-		assert(node);
-		node->next = NULL;
-		/** connect node to list tail */
-		root->tail->next = node;
-		/** now node is tail */
-		root->tail = node;		
-	}
-    debug(" -- add ip: \"%s\"\n", ip);
-	strncpy(root->tail->ip, ip, MAX_IP_LEN);
-}
-
-void free_ip_list(struct ip_root_s *root)
-{
-	struct ip_list_s *node = root->head;
-	while (node) {
-		free (node);
-		node = node->next;
-	}
-	root->head = NULL;
-	root->tail = NULL;
-}
 
 #include <sys/stat.h>
 long get_last_modified_time(const char *filename)
@@ -168,7 +42,6 @@ void load_white_ips(struct ip_root_s *o_ip_root, const char *filename)
 	fclose(fp);
 }
 
-
 // Select auth method, return 0 if success, -1 if failed
 static int select_method(int sock)
 {
@@ -178,10 +51,10 @@ static int select_method(int sock)
     METHOD_SELECT_REQUEST *method_request;
     METHOD_SELECT_RESPONSE *method_response;
 
-    // recv METHOD_SELECT_REQUEST
-    int ret = recv(sock, recv_buffer, BUFF_SIZE, 0);
+    // x_recv METHOD_SELECT_REQUEST
+    int ret = x_recv(sock, recv_buffer, BUFF_SIZE, 0);
     if (ret <=0) {
-        debug("sock %d recv method error, %m\n", sock);
+        debug("sock %d x_recv method error, %m\n", sock);
         return -1;
     }
     // if client request a wrong version or a wrong number_method
@@ -193,14 +66,14 @@ static int select_method(int sock)
     // if not socks5
     if ((int)method_request->version != VERSION) {
         method_response->select_method = 0xff;
-        send(sock, method_response, sizeof(METHOD_SELECT_RESPONSE), 0);
+        x_send(sock, method_response, sizeof(METHOD_SELECT_RESPONSE), 0);
         debug("sock %d is not socks5 proxy\n", sock);
         return -1;
     }
 
     method_response->select_method = 0; // none
-    if (-1 == send(sock, method_response, sizeof(METHOD_SELECT_RESPONSE), 0)) {
-        debug("send selected method to sock %d failed\n", sock);
+    if (-1 == x_send(sock, method_response, sizeof(METHOD_SELECT_RESPONSE), 0)) {
+        debug("x_send selected method to sock %d failed\n", sock);
         return -1;
     }
 
@@ -217,14 +90,14 @@ static int auth_password(int sock)
     AUTH_RESPONSE *auth_response;
 
     // auth username and password
-    int ret = recv(sock, recv_buffer, BUFF_SIZE, 0);
+    int ret = x_recv(sock, recv_buffer, BUFF_SIZE, 0);
     if (ret <= 0)
     {
-    perror("recv username and password error");
+    perror("x_recv username and password error");
     close(sock);
     return -1;
     }
-    //printf("AuthPass: recv %d bytes\n", ret);
+    //printf("AuthPass: x_recv %d bytes\n", ret);
 
     auth_request = (AUTH_REQUEST *)recv_buffer;
 
@@ -248,7 +121,7 @@ static int auth_password(int sock)
     if ((strncmp(recv_name, USER_NAME, strlen(USER_NAME)) == 0) &&
     (strncmp(recv_pass, PASS_WORD, strlen(PASS_WORD)) == 0)) {
         auth_response->result = 0x00;
-        if (-1 == send(sock, auth_response, sizeof(AUTH_RESPONSE), 0)) {
+        if (-1 == x_send(sock, auth_response, sizeof(AUTH_RESPONSE), 0)) {
             close(sock);
             return -1;
         }else{
@@ -256,7 +129,7 @@ static int auth_password(int sock)
         }
     }else{
         auth_response->result = 0x01;
-        send(sock, auth_response, sizeof(AUTH_RESPONSE), 0);
+        x_send(sock, auth_response, sizeof(AUTH_RESPONSE), 0);
 
         close(sock);
         return -1;
@@ -273,10 +146,10 @@ static int parse_cmd(int sock)
     SOCKS5_REQUEST *socks5_request;
     SOCKS5_RESPONSE *socks5_response;
 
-    // recv command
-    int ret = recv(sock, recv_buffer, BUFF_SIZE, 0);
+    // x_recv command
+    int ret = x_recv(sock, recv_buffer, BUFF_SIZE, 0);
     if (ret <= 0) {
-        debug("sock %d recv connect command error, %m\n", sock);
+        debug("sock %d x_recv connect command error, %m\n", sock);
         return -1;
     }
 
@@ -333,77 +206,17 @@ static int parse_cmd(int sock)
     ret = connect(real_server_sock, (struct sockaddr *)&sin, sizeof(struct sockaddr_in));
     if (ret == 0) {
         socks5_response->reply = 0x00;
-        if (-1 == send(sock, socks5_response, 10, 0)) {
-            debug("send res to sock %d failed, %m\n", sock);
+        if (-1 == x_send(sock, socks5_response, 10, 0)) {
+            debug("x_send res to sock %d failed, %m\n", sock);
             return -1;
         }
     } else {
         socks5_response->reply = 0x01;
-        send(sock, socks5_response, 10, 0);
+        x_send(sock, socks5_response, 10, 0);
         debug("sock %d connect to real server error, %m\n", sock);
         return -1;
     }
     return real_server_sock;
-}
-
-static int forward_data(int sock, int real_server_sock)
-{
-    char recv_buffer[BUFF_SIZE] = {0};
-
-    fd_set fd_read;
-    struct timeval time_out;
-
-    time_out.tv_sec = TIME_OUT;
-    time_out.tv_usec = 0;
-
-    int ret = 0;
-    long cur = get_cur_ms();
-    while(1) {
-        FD_ZERO(&fd_read);
-        FD_SET(sock, &fd_read);
-        FD_SET(real_server_sock, &fd_read);
-
-        if (get_cur_ms()-cur >TIME_OUT_MS) {
-            //debug("sock %d timeout\n", sock);
-            break;
-        } 
-        ret = select((sock > real_server_sock ? sock : real_server_sock) + 1, &fd_read, NULL, NULL, &time_out);
-        if (-1 == ret) {
-            debug("%d select socket[%d, %d] error, %m\n", (unsigned char)pthread_self(), sock, real_server_sock);
-            break;
-        } else if (0 == ret) {
-            continue;
-        }
-        if (FD_ISSET(sock, &fd_read)) {
-            //printf("client can read!\n");
-            memset(recv_buffer, 0, BUFF_SIZE);
-            ret = recv(sock, recv_buffer, BUFF_SIZE, 0);
-            if (ret <= 0) {
-                debug("sock %d recv from client error, %m\n", sock);
-                break;
-            }
-            ret = send(real_server_sock, recv_buffer, ret, 0);
-            if (ret == -1) {
-                debug("sock %d send data to real server failed, %m\n", sock);
-                break;
-            }
-        } else if (FD_ISSET(real_server_sock, &fd_read)) {
-            //printf("real server can read!\n");
-            memset(recv_buffer, 0, BUFF_SIZE);
-            ret = recv(real_server_sock, recv_buffer, BUFF_SIZE, 0);
-            if (ret <= 0) {
-                debug("real server sock recv data failed, %m\n");
-                break;
-            }
-            ret = send(sock, recv_buffer, ret, 0);
-            if (ret == -1) {
-                perror("send data to client error");
-                break;
-            }
-        }
-    }
-
-    return 0;
 }
 
 void *socks5_proxy_thread(void *client_sock)
@@ -468,6 +281,8 @@ int main(int argc, char *argv[])
 
     struct ip_root_s ips_root = {NULL, NULL};
     load_white_ips(&ips_root, WHITE_IP_LIST);
+
+    x_send_recv_init();
 
     struct sockaddr_in sin = {0};
     sin.sin_family = AF_INET;
