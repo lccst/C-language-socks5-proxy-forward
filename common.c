@@ -39,7 +39,7 @@ static void pwd_dic_data(const unsigned char *data, int len, unsigned char *o_re
 {
 	int i = 0;
 	for (i=0; i<len; i++) {
-		o_result[i] = (char)s_pwd_dic[data[i] ];
+		o_result[i] = (unsigned char)s_pwd_dic[data[i] ];
 	}
 }
 
@@ -47,7 +47,7 @@ static void dic_pwd_data(const unsigned char *data, int len, unsigned char *o_re
 {
 	int i=0;
 	for (i=0; i<len; i++) {
-		o_result[i] = (char)s_dic_pwd[data[i] ];
+		o_result[i] = (unsigned char)s_dic_pwd[data[i] ];
 	}
 }
 
@@ -142,7 +142,7 @@ long get_cur_ms()
 
 int forward_data(int sock, int real_server_sock)
 {
-    char recv_buffer[BUFF_SIZE] = {0};
+    unsigned char recv_buffer[BUFF_SIZE] = {0};
 
     fd_set fd_read;
     struct timeval time_out;
@@ -204,7 +204,7 @@ int forward_data(int sock, int real_server_sock)
 
 int forward_proxy_data(int sock, int real_server_sock)
 {
-    char recv_buffer[BUFF_SIZE] = {0};
+    unsigned char recv_buffer[BUFF_SIZE] = {0};
 
     fd_set fd_read;
     struct timeval time_out;
