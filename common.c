@@ -3,7 +3,7 @@
 #define random(x) (rand()%x)
 
 #define PWD_DIC_SEED	7758
-#define MAX_DIC_CNT		255
+#define MAX_DIC_CNT		256
 
 
 static int s_pwd_dic[MAX_DIC_CNT] = {0};
@@ -52,7 +52,7 @@ static void dic_pwd_data(const unsigned char *data, int len, unsigned char *o_re
 }
 
 long x_send(int sock, const void *buf, size_t n, int flag)
-{
+{//return send(sock, buf, n, flag);
     unsigned char *res = malloc(n);
     assert(res);
     memset(res, 0, n);
@@ -65,7 +65,7 @@ long x_send(int sock, const void *buf, size_t n, int flag)
     return ret;
 }
 long x_recv(int sock, void *buf, size_t n, int flag)
-{
+{//return recv(sock, buf, n, flag);
     unsigned char *raw = malloc(n);
     assert(raw);
     memset(raw, 0, n);
@@ -81,6 +81,7 @@ long x_recv(int sock, void *buf, size_t n, int flag)
 
 void x_send_recv_init()
 {
+    assert(MAX_DIC_CNT>255);
     generate_pwd_dic();
 }
 
@@ -175,9 +176,7 @@ int forward_data(int sock, int real_server_sock)
             if (ret <= 0) {
                 debug("sock %d x_recv from client error, %m\n", sock);
                 break;
-            }
-        printf("(%d) %x %x %x %x %x %x\n", ret, recv_buffer[0], recv_buffer[1],
-                recv_buffer[2], recv_buffer[3], recv_buffer[4], recv_buffer[5]);
+            } 
             ret = x_send(real_server_sock, recv_buffer, ret, 0);
             if (ret == -1) {
                 debug("sock %d x_send data to real server failed, %m\n", sock);
