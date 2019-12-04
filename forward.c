@@ -107,16 +107,16 @@ int main(int argc, char *argv[])
         }
         create_thread_start(client_sockfd);
 
-        // forward_data_thread(&client_sockfd);
-        pthread_t work_thread;
-        if (pthread_create(&work_thread, NULL, forward_data_thread, (void *)&client_sockfd)) {
-            debug("create thread for sock %d failed, %m\n", client_sockfd);
-            close(client_sockfd);
-        }else{
-            pthread_detach(work_thread);
-        }
-        while(!is_thread_created())
-            usleep(1000);
+        forward_data_thread(&client_sockfd);
+        // pthread_t work_thread;
+        // if (pthread_create(&work_thread, NULL, forward_data_thread, (void *)&client_sockfd)) {
+        //     debug("create thread for sock %d failed, %m\n", client_sockfd);
+        //     close(client_sockfd);
+        // }else{
+        //     pthread_detach(work_thread);
+        // }
+        // while(!is_thread_created())
+        //     usleep(1000);
 	}
 	
 

@@ -35,29 +35,30 @@ static void generate_pwd_dic()
 	}
 }
 
-static void pwd_dic_data(const char *data, int len, char *o_result)
+static void pwd_dic_data(const unsigned char *data, int len, unsigned char *o_result)
 {
 	int i = 0;
 	for (i=0; i<len; i++) {
-		o_result[i] = s_pwd_dic[data[i] ];
+		o_result[i] = (char)s_pwd_dic[data[i] ];
 	}
 }
 
-static void dic_pwd_data(const char *data, int len, char *o_result)
+static void dic_pwd_data(const unsigned char *data, int len, unsigned char *o_result)
 {
 	int i=0;
 	for (i=0; i<len; i++) {
-		o_result[i] = s_dic_pwd[data[i] ];
+		o_result[i] = (char)s_dic_pwd[data[i] ];
 	}
 }
 
 long x_send(int sock, const void *buf, size_t n, int flag)
 {
-    char *res = malloc(n);
+    unsigned char *res = malloc(n);
     assert(res);
     memset(res, 0, n);
 
-    pwd_dic_data((const char *)buf, n, res);
+    pwd_dic_data((const unsigned char *)buf, n, res);
+
     long ret = send(sock, res, n, flag);
     free(res);
 
@@ -65,7 +66,7 @@ long x_send(int sock, const void *buf, size_t n, int flag)
 }
 long x_recv(int sock, void *buf, size_t n, int flag)
 {
-    char *raw = malloc(n);
+    unsigned char *raw = malloc(n);
     assert(raw);
     memset(raw, 0, n);
 
@@ -175,6 +176,8 @@ int forward_data(int sock, int real_server_sock)
                 debug("sock %d x_recv from client error, %m\n", sock);
                 break;
             }
+        printf("(%d) %x %x %x %x %x %x\n", ret, recv_buffer[0], recv_buffer[1],
+                recv_buffer[2], recv_buffer[3], recv_buffer[4], recv_buffer[5]);
             ret = x_send(real_server_sock, recv_buffer, ret, 0);
             if (ret == -1) {
                 debug("sock %d x_send data to real server failed, %m\n", sock);
