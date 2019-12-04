@@ -47,7 +47,7 @@ static void dic_pwd_data(const char *data, int len, char *o_result)
 {
 	int i=0;
 	for (i=0; i<len; i++) {
-		o_result[i] = s_dic_pwd[s_pwd_dic[data[i] ] ];
+		o_result[i] = s_dic_pwd[data[i] ];
 	}
 }
 
