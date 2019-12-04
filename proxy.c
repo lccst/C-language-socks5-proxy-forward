@@ -27,7 +27,7 @@
 #define AUTH_CODE 0x02
 
 #define TIME_OUT 5   // seconds
-#define TIME_OUT_MS 5000
+#define TIME_OUT_MS 10000
 
 #define WHITE_IP_LIST       "white_ip_list.txt"
 #define TOUCH_WHITE_IP_LIST 

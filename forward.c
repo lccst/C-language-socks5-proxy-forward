@@ -13,7 +13,7 @@
 #include <arpa/inet.h>
 #include <assert.h>
 
-#define	TIME_OUT_MS		3000
+#define	TIME_OUT_MS		10000
 
 #define		debug(fmt, ...)			printf((fmt), ##__VA_ARGS__)
 
