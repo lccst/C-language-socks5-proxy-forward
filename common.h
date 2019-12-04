@@ -96,5 +96,6 @@ void add_ip(struct ip_root_s *root, const char *ip);
 void free_ip_list(struct ip_root_s *root);
 
 int forward_data(int sock, int real_server_sock);
+int forward_proxy_data(int sock, int real_server_sock);
 
 #endif

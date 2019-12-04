@@ -198,3 +198,63 @@ int forward_data(int sock, int real_server_sock)
 
     return 0;
 }
+
+int forward_proxy_data(int sock, int real_server_sock)
+{
+    char recv_buffer[BUFF_SIZE] = {0};
+
+    fd_set fd_read;
+    struct timeval time_out;
+
+    time_out.tv_sec = TIME_OUT;
+    time_out.tv_usec = 0;
+
+    int ret = 0;
+    long cur = get_cur_ms();
+    while(1) {
+        FD_ZERO(&fd_read);
+        FD_SET(sock, &fd_read);
+        FD_SET(real_server_sock, &fd_read);
+
+        if (get_cur_ms()-cur >TIME_OUT_MS) {
+            //debug("sock %d timeout\n", sock);
+            break;
+        } 
+        ret = select((sock > real_server_sock ? sock : real_server_sock) + 1, &fd_read, NULL, NULL, &time_out);
+        if (-1 == ret) {
+            debug("%d select socket[%d, %d] error, %m\n", (unsigned char)pthread_self(), sock, real_server_sock);
+            break;
+        } else if (0 == ret) {
+            continue;
+        }
+        if (FD_ISSET(sock, &fd_read)) {
+            //printf("client can read!\n");
+            memset(recv_buffer, 0, BUFF_SIZE);
+            ret = x_recv(sock, recv_buffer, BUFF_SIZE, 0);
+            if (ret <= 0) {
+                debug("sock %d x_recv from client error, %m\n", sock);
+                break;
+            }
+            ret = send(real_server_sock, recv_buffer, ret, 0);
+            if (ret == -1) {
+                debug("sock %d x_send data to real server failed, %m\n", sock);
+                break;
+            }
+        } else if (FD_ISSET(real_server_sock, &fd_read)) {
+            //printf("real server can read!\n");
+            memset(recv_buffer, 0, BUFF_SIZE);
+            ret = recv(real_server_sock, recv_buffer, BUFF_SIZE, 0);
+            if (ret <= 0) {
+                debug("real server sock x_recv data failed, %m\n");
+                break;
+            }
+            ret = x_send(sock, recv_buffer, ret, 0);
+            if (ret == -1) {
+                perror("x_send data to client error");
+                break;
+            }
+        }
+    }
+
+    return 0;
+}
