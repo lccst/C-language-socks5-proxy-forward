@@ -188,7 +188,7 @@ int forward_data(int sock, int real_server_sock)
                 debug("real server sock x_recv data failed, %m\n");
                 break;
             }
-            ret = x_send(sock, recv_buffer, ret, 0);
+            ret = send(sock, recv_buffer, ret, 0);
             if (ret == -1) {
                 perror("x_send data to client error");
                 break;
