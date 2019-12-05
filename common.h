@@ -19,7 +19,7 @@
 #define BUFF_SIZE 10240
 
 #define TIME_OUT 5   // seconds
-#define TIME_OUT_MS 10000
+#define TIME_OUT_MS 3000
 
 #define WHITE_IP_LIST       "white_ip_list.txt"
 
@@ -95,7 +95,7 @@ long x_send(int sock, const void *buf, size_t n, int flag);
 void add_ip(struct ip_root_s *root, const char *ip);
 void free_ip_list(struct ip_root_s *root);
 
-int forward_data(int sock, int real_server_sock);
-int forward_proxy_data(int sock, int real_server_sock);
+/** x_sock using xsend-xrecv, sock using send-recv */
+int forward_data(int x_sock, int sock);
 
 #endif

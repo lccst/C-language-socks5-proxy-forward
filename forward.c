@@ -39,8 +39,8 @@ void *forward_data_thread(void *param)
 		goto error;
 	}
 
-	forward_data(ct_sock, fd_sock);
-
+	/** note: order of parameter is important */
+	forward_data(fd_sock, ct_sock);
 
 	close(ct_sock);
 	close(fd_sock);

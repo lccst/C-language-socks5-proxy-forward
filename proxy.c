@@ -242,7 +242,9 @@ void *socks5_proxy_thread(void *client_sock)
         debug("sock %d parse command failed.\n", sock);
         goto error;
     }
-    forward_proxy_data(sock, real_server_sock);
+
+    /** note: order of parameter is important */
+    forward_data(sock, real_server_sock);
 
     close(sock);
     close(real_server_sock);

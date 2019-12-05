@@ -139,9 +139,8 @@ long get_cur_ms()
     return (long)(tv.tv_sec*1000 + tv.tv_usec/1000);
 }
 
-
-
-int forward_data(int sock, int real_server_sock)
+/** x_sock using xsend-xrecv, sock using send-recv */
+int forward_data(int x_sock, int sock)
 {
     unsigned char recv_buffer[BUFF_SIZE] = {0};
 
@@ -155,102 +154,42 @@ int forward_data(int sock, int real_server_sock)
     long cur = get_cur_ms();
     while(1) {
         FD_ZERO(&fd_read);
+        FD_SET(x_sock, &fd_read);
         FD_SET(sock, &fd_read);
-        FD_SET(real_server_sock, &fd_read);
 
         if (get_cur_ms()-cur >TIME_OUT_MS) {
-            //debug("sock %d timeout\n", sock);
+            //debug("x_sock %d timeout\n", x_sock);
             break;
         } 
-        ret = select((sock > real_server_sock ? sock : real_server_sock) + 1, &fd_read, NULL, NULL, &time_out);
+        ret = select((x_sock > sock ? x_sock : sock) + 1, &fd_read, NULL, NULL, &time_out);
         if (-1 == ret) {
-            debug("%d select socket[%d, %d] error, %m\n", (unsigned char)pthread_self(), sock, real_server_sock);
+            debug("%d select x_socket[%d, %d] error, %m\n", (unsigned char)pthread_self(), x_sock, sock);
             break;
         } else if (0 == ret) {
             continue;
         }
-        if (FD_ISSET(sock, &fd_read)) {
+        if (FD_ISSET(x_sock, &fd_read)) {
             //printf("client can read!\n");
             memset(recv_buffer, 0, BUFF_SIZE);
-            ret = recv(sock, recv_buffer, BUFF_SIZE, 0);
+            ret = x_recv(x_sock, recv_buffer, BUFF_SIZE, 0);
             if (ret <= 0) {
-                debug("sock %d x_recv from client error, %m\n", sock);
-                break;
-            } 
-            ret = x_send(real_server_sock, recv_buffer, ret, 0);
-            if (ret == -1) {
-                debug("sock %d x_send data to real server failed, %m\n", sock);
-                break;
-            }
-        } else if (FD_ISSET(real_server_sock, &fd_read)) {
-            //printf("real server can read!\n");
-            memset(recv_buffer, 0, BUFF_SIZE);
-            ret = x_recv(real_server_sock, recv_buffer, BUFF_SIZE, 0);
-            if (ret <= 0) {
-                debug("real server sock x_recv data failed, %m\n");
+                debug("x_sock %d x_recv from client error, %m\n", x_sock);
                 break;
             }
             ret = send(sock, recv_buffer, ret, 0);
             if (ret == -1) {
-                perror("x_send data to client error");
+                debug("x_sock %d x_send data to real server failed, %m\n", x_sock);
                 break;
             }
-        }
-    }
-
-    return 0;
-}
-
-int forward_proxy_data(int sock, int real_server_sock)
-{
-    unsigned char recv_buffer[BUFF_SIZE] = {0};
-
-    fd_set fd_read;
-    struct timeval time_out;
-
-    time_out.tv_sec = TIME_OUT;
-    time_out.tv_usec = 0;
-
-    int ret = 0;
-    long cur = get_cur_ms();
-    while(1) {
-        FD_ZERO(&fd_read);
-        FD_SET(sock, &fd_read);
-        FD_SET(real_server_sock, &fd_read);
-
-        if (get_cur_ms()-cur >TIME_OUT_MS) {
-            //debug("sock %d timeout\n", sock);
-            break;
-        } 
-        ret = select((sock > real_server_sock ? sock : real_server_sock) + 1, &fd_read, NULL, NULL, &time_out);
-        if (-1 == ret) {
-            debug("%d select socket[%d, %d] error, %m\n", (unsigned char)pthread_self(), sock, real_server_sock);
-            break;
-        } else if (0 == ret) {
-            continue;
-        }
-        if (FD_ISSET(sock, &fd_read)) {
-            //printf("client can read!\n");
-            memset(recv_buffer, 0, BUFF_SIZE);
-            ret = x_recv(sock, recv_buffer, BUFF_SIZE, 0);
-            if (ret <= 0) {
-                debug("sock %d x_recv from client error, %m\n", sock);
-                break;
-            }
-            ret = send(real_server_sock, recv_buffer, ret, 0);
-            if (ret == -1) {
-                debug("sock %d x_send data to real server failed, %m\n", sock);
-                break;
-            }
-        } else if (FD_ISSET(real_server_sock, &fd_read)) {
+        } else if (FD_ISSET(sock, &fd_read)) {
             //printf("real server can read!\n");
             memset(recv_buffer, 0, BUFF_SIZE);
-            ret = recv(real_server_sock, recv_buffer, BUFF_SIZE, 0);
+            ret = recv(sock, recv_buffer, BUFF_SIZE, 0);
             if (ret <= 0) {
-                debug("real server sock x_recv data failed, %m\n");
+                debug("real server x_sock x_recv data failed, %m\n");
                 break;
             }
-            ret = x_send(sock, recv_buffer, ret, 0);
+            ret = x_send(x_sock, recv_buffer, ret, 0);
             if (ret == -1) {
                 perror("x_send data to client error");
                 break;
