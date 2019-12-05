@@ -168,6 +168,7 @@ int forward_data(int x_sock, int sock)
         } else if (0 == ret) {
             continue;
         }
+        cur = get_cur_ms();
         if (FD_ISSET(x_sock, &fd_read)) {
             //printf("client can read!\n");
             memset(recv_buffer, 0, BUFF_SIZE);

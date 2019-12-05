@@ -19,7 +19,7 @@
 #define BUFF_SIZE 10240
 
 #define TIME_OUT 5   // seconds
-#define TIME_OUT_MS 3000
+#define TIME_OUT_MS 10000
 
 #define WHITE_IP_LIST       "white_ip_list.txt"
 
